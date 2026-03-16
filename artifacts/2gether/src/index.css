@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme inline {
@@ -44,42 +44,86 @@
   --radius-xl: 0.75rem;
 }
 
-/* Base Theme - Forced Dark Mode (VS Code Aesthetic) */
 :root {
-  /* Core VS Code Dark Theme Colors */
-  --background: 0 0% 12%; /* #1e1e1e */
-  --foreground: 0 0% 83%; /* #d4d4d4 */
-  
-  --sidebar: 240 1% 15%; /* #252526 */
-  --sidebar-foreground: 0 0% 80%;
-  --sidebar-border: 240 3% 20%;
-  
-  --panel: 0 0% 9%; /* Darker for console/terminals */
-  
-  --card: 240 1% 15%;
-  --card-foreground: 0 0% 83%;
-  
-  --border: 240 3% 25%; /* #3e3e42 */
-  --input: 240 3% 25%;
-  --ring: 204 100% 40%;
-  
-  --primary: 204 100% 40%; /* #007acc */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 18%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 215 28% 25%;
+  --border: 215 28% 25%;
+  --input: 215 28% 25%;
+  --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
-  
-  --secondary: 240 3% 20%;
-  --secondary-foreground: 0 0% 90%;
-  
-  --muted: 240 1% 20%;
-  --muted-foreground: 0 0% 52%; /* #858585 */
-  
-  --accent: 204 100% 40%;
+  --secondary: 222 47% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 222 47% 16%;
+  --muted-foreground: 215 20% 58%;
+  --accent: 217 91% 60%;
   --accent-foreground: 0 0% 100%;
-  
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-
+  --ring: 217 91% 60%;
+  --popover: 222 47% 18%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 215 28% 25%;
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 215 28% 25%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 47% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-ring: 217 91% 60%;
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 280 65% 60%;
+  --chart-4: 32 95% 55%;
+  --chart-5: 0 84% 60%;
+  
   --success: 142 71% 45%;
   --success-foreground: 0 0% 10%;
+  --panel: 222 47% 16%;
+}
+
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 18%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 215 28% 25%;
+  --border: 215 28% 25%;
+  --input: 215 28% 25%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 47% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 222 47% 16%;
+  --muted-foreground: 215 20% 58%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 217 91% 60%;
+  --popover: 222 47% 18%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 215 28% 25%;
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 215 28% 25%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 47% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-ring: 217 91% 60%;
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 280 65% 60%;
+  --chart-4: 32 95% 55%;
+  --chart-5: 0 84% 60%;
+  
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 10%;
+  --panel: 222 47% 16%;
 }
 
 @layer base {
@@ -90,13 +134,13 @@
   html {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    scroll-behavior: smooth;
   }
 
   body {
     @apply font-sans antialiased m-0 p-0 overflow-x-hidden;
   }
 
-  /* Custom Scrollbar for IDE feel */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
