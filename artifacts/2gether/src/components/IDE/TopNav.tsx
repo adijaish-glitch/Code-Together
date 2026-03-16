@@ -2,14 +2,33 @@ import { Link } from "wouter";
 import { Users, Copy, Check, LogOut, Code2, Wifi, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { RolePanel, RoleBadge } from "./RolePanel";
+
+type Role = "driver" | "navigator" | null;
 
 interface TopNavProps {
   roomId: string;
   usersOnline: number;
   isConnected: boolean;
+  isHost: boolean;
+  users: string[];
+  roles: Record<string, Role>;
+  currentUser: string;
+  myRole: Role;
+  onAssignRole: (username: string, role: Role) => void;
 }
 
-export function TopNav({ roomId, usersOnline, isConnected }: TopNavProps) {
+export function TopNav({
+  roomId,
+  usersOnline,
+  isConnected,
+  isHost,
+  users,
+  roles,
+  currentUser,
+  myRole,
+  onAssignRole,
+}: TopNavProps) {
   const [copied, setCopied] = useState(false);
 
   const copyRoomId = () => {
@@ -33,7 +52,7 @@ export function TopNav({ roomId, usersOnline, isConnected }: TopNavProps) {
         <div className="flex items-center gap-2 bg-background/50 px-2.5 py-1 rounded border border-border/50">
           <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">ROOM</span>
           <span className="text-xs font-mono text-foreground font-medium">{roomId}</span>
-          <button 
+          <button
             onClick={copyRoomId}
             className="ml-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
             title="Copy Room ID"
@@ -43,7 +62,23 @@ export function TopNav({ roomId, usersOnline, isConnected }: TopNavProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {/* My current role badge (non-host) */}
+        {!isHost && myRole && (
+          <RoleBadge role={myRole} />
+        )}
+
+        {/* Role assignment panel (host only) */}
+        <RolePanel
+          isHost={isHost}
+          users={users}
+          roles={roles}
+          currentUser={currentUser}
+          onAssignRole={onAssignRole}
+        />
+
+        <div className="w-px h-5 bg-border/50 hidden sm:block" />
+
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           {isConnected ? (
             <Wifi size={14} className="text-success" />
@@ -54,14 +89,14 @@ export function TopNav({ roomId, usersOnline, isConnected }: TopNavProps) {
             {isConnected ? "Connected" : "Disconnected"}
           </span>
         </div>
-        
+
         <div className="flex items-center gap-2 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50">
           <Users size={14} className={usersOnline > 1 ? "text-primary" : "text-muted-foreground"} />
           <span className="text-foreground">{usersOnline} <span className="text-muted-foreground hidden sm:inline">online</span></span>
         </div>
 
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           className="flex items-center gap-2 text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive hover:text-white px-3 py-1.5 rounded transition-colors"
         >
           <LogOut size={14} />

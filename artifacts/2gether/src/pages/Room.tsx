@@ -9,19 +9,22 @@ import { useRunCode } from "@/hooks/use-run-code";
 
 export function Room() {
   const { roomId } = useParams<{ roomId: string }>();
-  
-  // Connect to room via socket
-  const { 
-    isConnected, 
-    usersOnline, 
-    username, 
-    code, 
-    messages, 
-    sendCodeUpdate, 
-    sendMessage 
+
+  const {
+    isConnected,
+    usersOnline,
+    username,
+    code,
+    messages,
+    isHost,
+    roles,
+    users,
+    myRole,
+    sendCodeUpdate,
+    sendMessage,
+    assignRole,
   } = useSocket(roomId || "default-room");
 
-  // Code execution state
   const { mutate: runCode, isPending: isRunning } = useRunCode();
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -36,7 +39,7 @@ export function Room() {
       },
       onError: (err) => {
         setError(err.message);
-      }
+      },
     });
   };
 
@@ -45,24 +48,34 @@ export function Room() {
     setError(undefined);
   };
 
+  // Navigator is read-only. Driver and unassigned can edit.
+  const isReadOnly = myRole === "navigator";
+
   if (!roomId) return null;
 
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden font-sans">
-      <TopNav 
-        roomId={roomId} 
-        usersOnline={usersOnline} 
-        isConnected={isConnected} 
+      <TopNav
+        roomId={roomId}
+        usersOnline={usersOnline}
+        isConnected={isConnected}
+        isHost={isHost}
+        users={users}
+        roles={roles}
+        currentUser={username}
+        myRole={myRole}
+        onAssignRole={assignRole}
       />
-      
+
       <div className="flex-1 flex overflow-hidden">
         {/* Main Left Column: Editor + Console */}
         <div className="flex-1 flex flex-col min-w-0">
-          <Editor 
-            code={code} 
-            onChange={sendCodeUpdate} 
+          <Editor
+            code={code}
+            onChange={sendCodeUpdate}
+            readOnly={isReadOnly}
           />
-          <Console 
+          <Console
             className="h-1/3 min-h-[200px]"
             output={output}
             error={error}
@@ -71,9 +84,9 @@ export function Room() {
             onClear={handleClearConsole}
           />
         </div>
-        
+
         {/* Right Column: Chat */}
-        <ChatPanel 
+        <ChatPanel
           className="w-[300px] lg:w-[350px] shrink-0"
           messages={messages}
           currentUser={username}
