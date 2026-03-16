@@ -65,7 +65,7 @@ export function setupSocketHandlers(io: SocketIOServer) {
         message,
         timestamp: Date.now(),
       };
-      io.to(roomId).emit("chat-message", chatMessage);
+      socket.to(roomId).emit("chat-message", chatMessage);
     });
 
     socket.on("disconnect", () => {
