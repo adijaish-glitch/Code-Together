@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "2gether Programming"
+version = "1.0.0"
+id = "artifacts/2gether"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 23341
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/2gether run dev"
+
+[services.env]
+PORT = "23341"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/2gether", "run", "build"]
+publicDir = "artifacts/2gether/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

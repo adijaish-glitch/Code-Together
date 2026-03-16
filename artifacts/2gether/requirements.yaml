@@ -1,0 +1,17 @@
+packages:
+  "@monaco-editor/react": "For the core code editor experience"
+  "socket.io-client": "For real-time code and chat synchronization"
+  "framer-motion": "For smooth UI transitions and landing page animations"
+  "lucide-react": "For icons throughout the UI"
+  "clsx": "For conditional class names"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "date-fns": "For formatting chat message timestamps"
+
+images:
+  - path: "artifacts/2gether/public/images/hero-bg.png"
+    description: "Abstract minimal dark background with subtle glowing blue and purple geometric wireframe patterns, representing code and connections, very dark and premium"
+    aspect_ratio: "16:9"
+
+notes:
+  - Expecting Socket.io server to run on the same origin
+  - Expecting /api/run-code POST endpoint taking { code } and returning { output, error }
