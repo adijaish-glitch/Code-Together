@@ -25,13 +25,14 @@ export function useSocket(roomId: string, displayName: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [username, setUsername] = useState(displayName);
+  const [username, setUsername] = useState(displayName || "User");
   const [isHost, setIsHost] = useState(false);
   const [roles, setRoles] = useState<Record<string, Role>>({});
   const [users, setUsers] = useState<string[]>([]);
 
   const socketRef = useRef<Socket | null>(null);
 
+  // Stable callback — defined before useEffect so it can be safely referenced
   const addSystemMessage = useCallback((text: string) => {
     setMessages((prev) => [
       ...prev,
@@ -40,6 +41,8 @@ export function useSocket(roomId: string, displayName: string) {
   }, []);
 
   useEffect(() => {
+    if (!roomId) return;
+
     const socket = io(window.location.origin, {
       path: "/api/socket.io",
       reconnectionAttempts: 5,
@@ -48,7 +51,7 @@ export function useSocket(roomId: string, displayName: string) {
 
     socket.on("connect", () => {
       setIsConnected(true);
-      socket.emit("join-room", { roomId, username: displayName });
+      socket.emit("join-room", { roomId, username: displayName || "User" });
     });
 
     socket.on("disconnect", () => setIsConnected(false));
@@ -62,49 +65,50 @@ export function useSocket(roomId: string, displayName: string) {
       files: FileNode[];
       activeFileId: string | null;
     }) => {
-      setUsername(data.username);
-      setUsersOnline(data.usersOnline);
-      setIsHost(data.isHost);
-      setRoles(data.roles);
-      setUsers(data.users);
-      setFiles(data.files);
-      setActiveFileId(data.activeFileId);
+      if (data.username) setUsername(data.username);
+      if (typeof data.usersOnline === "number") setUsersOnline(data.usersOnline);
+      setIsHost(!!data.isHost);
+      setRoles(data.roles ?? {});
+      setUsers(data.users ?? []);
+      setFiles(data.files ?? []);
+      setActiveFileId(data.activeFileId ?? null);
     });
 
-    socket.on("user-joined", (data: { username: string; usersOnline: number; users: string[] }) => {
-      setUsersOnline(data.usersOnline);
-      setUsers(data.users);
+    socket.on("user-joined", (data: { username: string; usersOnline: number; users?: string[] }) => {
+      if (typeof data.usersOnline === "number") setUsersOnline(data.usersOnline);
+      setUsers(data.users ?? []);
       addSystemMessage(`${data.username} joined the room.`);
     });
 
-    socket.on("user-left", (data: { username: string; usersOnline: number; users: string[] }) => {
-      setUsersOnline(data.usersOnline);
-      setUsers(data.users);
-      addSystemMessage(`${data.username} left the room.`);
+    socket.on("user-left", (data: { username: string; usersOnline: number; users?: string[] }) => {
+      if (typeof data.usersOnline === "number") setUsersOnline(data.usersOnline);
+      setUsers(data.users ?? []);
+      addSystemMessage(`${data.username ?? "Someone"} left the room.`);
     });
 
-    socket.on("user-count", (data: { usersOnline: number }) => setUsersOnline(data.usersOnline));
+    socket.on("user-count", (data: { usersOnline: number }) => {
+      if (typeof data.usersOnline === "number") setUsersOnline(data.usersOnline);
+    });
 
-    // File system events
     socket.on("file-content-updated", (data: { fileId: string; code: string }) => {
+      if (!data?.fileId) return;
       setFiles((prev) =>
-        prev.map((f) => (f.id === data.fileId ? { ...f, content: data.code } : f))
+        prev.map((f) => (f.id === data.fileId ? { ...f, content: data.code ?? "" } : f))
       );
     });
 
     socket.on("fs-updated", (data: { files: FileNode[]; newItemId?: string; deletedId?: string }) => {
+      if (!Array.isArray(data?.files)) return;
       setFiles(data.files);
-      // If active file was deleted, switch to first remaining file
       if (data.deletedId) {
         setActiveFileId((current) => {
           if (current === data.deletedId) {
-            const firstFile = data.files.find((f) => f.type === "file");
-            return firstFile?.id ?? null;
+            const first = data.files.find((f) => f.type === "file");
+            return first?.id ?? null;
           }
           return current;
         });
       }
-      // Auto-select newly created file
       if (data.newItemId) {
         const newItem = data.files.find((f) => f.id === data.newItemId);
         if (newItem?.type === "file") setActiveFileId(data.newItemId);
@@ -116,8 +120,8 @@ export function useSocket(roomId: string, displayName: string) {
     );
 
     socket.on("roles-updated", (data: { roles: Record<string, Role>; users: string[] }) => {
-      setRoles(data.roles);
-      setUsers(data.users);
+      setRoles(data.roles ?? {});
+      setUsers(data.users ?? []);
     });
 
     socket.on("host-transferred", () => {
@@ -125,10 +129,14 @@ export function useSocket(roomId: string, displayName: string) {
       addSystemMessage("You are now the host of this room.");
     });
 
-    return () => { socket.disconnect(); };
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [roomId, displayName, addSystemMessage]);
 
   const sendFileContentUpdate = useCallback((fileId: string, code: string) => {
+    if (!fileId) return;
     setFiles((prev) =>
       prev.map((f) => (f.id === fileId ? { ...f, content: code } : f))
     );
@@ -163,12 +171,29 @@ export function useSocket(roomId: string, displayName: string) {
     socketRef.current?.emit("rename-item", { roomId, id, name });
   }, [roomId]);
 
+  const selectFile = useCallback((id: string) => {
+    setActiveFileId(id);
+  }, []);
+
   const myRole: Role = roles[username] ?? null;
 
   return {
-    isConnected, usersOnline, username, files, activeFileId, setActiveFileId,
-    messages, isHost, roles, users, myRole,
-    sendFileContentUpdate, sendMessage, assignRole,
-    createItem, deleteItem, renameItem,
+    isConnected,
+    usersOnline,
+    username,
+    files,
+    activeFileId,
+    selectFile,
+    messages,
+    isHost,
+    roles,
+    users,
+    myRole,
+    sendFileContentUpdate,
+    sendMessage,
+    assignRole,
+    createItem,
+    deleteItem,
+    renameItem,
   };
 }

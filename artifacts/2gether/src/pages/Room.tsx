@@ -18,18 +18,32 @@ export function Room() {
   const [error, setError] = useState<string | undefined>();
 
   const {
-    isConnected, usersOnline, username, files, activeFileId, setActiveFileId,
-    messages, isHost, roles, users, myRole,
-    sendFileContentUpdate, sendMessage, assignRole,
-    createItem, deleteItem, renameItem,
-  } = useSocket(roomId || "default-room", displayName ?? "");
+    isConnected,
+    usersOnline,
+    username,
+    files = [],       // default prevents crash if socket hasn't connected yet
+    activeFileId,
+    selectFile,
+    messages = [],
+    isHost,
+    roles = {},
+    users = [],
+    myRole,
+    sendFileContentUpdate,
+    sendMessage,
+    assignRole,
+    createItem,
+    deleteItem,
+    renameItem,
+  } = useSocket(roomId ?? "default", displayName ?? "");
 
   const { mutate: runCode, isPending: isRunning } = useRunCode();
 
-  // Derive active file object from files array
+  // Safely find active file — files defaults to [] above
   const activeFile = files.find((f) => f.id === activeFileId) ?? null;
   const activeCode = activeFile?.content ?? "";
   const activeLanguage = activeFile?.language ?? "javascript";
+  const activeFilename = activeFile?.name ?? "";
 
   const handleCodeChange = (code: string) => {
     if (activeFileId) sendFileContentUpdate(activeFileId, code);
@@ -39,11 +53,14 @@ export function Room() {
     setOutput("");
     setError(undefined);
     if (activeLanguage !== "javascript") {
-      setError(`Execution is only supported for JavaScript.\nSwitch to a .js file to run code.`);
+      setError(`Execution is only supported for JavaScript.\nOpen or create a .js file to run code.`);
       return;
     }
     runCode(activeCode, {
-      onSuccess: (data) => { setOutput(data.output); setError(data.error); },
+      onSuccess: (data) => {
+        setOutput(data.output ?? "");
+        setError(data.error ?? undefined);
+      },
       onError: (err) => setError(err.message),
     });
   };
@@ -52,11 +69,17 @@ export function Room() {
 
   if (!roomId) return null;
 
-  if (displayName === null) {
+  // Show username modal before entering the room
+  if (!displayName) {
     return (
       <div className="h-screen w-full bg-background">
         <AnimatePresence>
-          <UsernameModal onConfirm={(name) => { saveUsername(name); setDisplayName(name); }} />
+          <UsernameModal
+            onConfirm={(name) => {
+              saveUsername(name);
+              setDisplayName(name);
+            }}
+          />
         </AnimatePresence>
       </div>
     );
@@ -76,28 +99,28 @@ export function Room() {
         onAssignRole={assignRole}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* File Tree */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* File Explorer */}
         <FileTree
           files={files}
           activeFileId={activeFileId}
-          onSelectFile={setActiveFileId}
+          onSelectFile={selectFile}
           onCreateItem={createItem}
           onDeleteItem={deleteItem}
           onRenameItem={renameItem}
         />
 
         {/* Editor + Console */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <Editor
             code={activeCode}
             onChange={handleCodeChange}
             readOnly={isReadOnly}
             language={activeLanguage}
-            filename={activeFile?.name ?? ""}
+            filename={activeFilename}
           />
           <Console
-            className="h-1/3 min-h-[200px]"
+            className="h-1/3 min-h-[180px] max-h-[40%]"
             output={output}
             error={error}
             isRunning={isRunning}
