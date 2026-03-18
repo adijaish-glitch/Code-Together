@@ -1,20 +1,74 @@
 import { type Server as SocketIOServer } from "socket.io";
+import { randomUUID } from "crypto";
 
 type Role = "driver" | "navigator" | null;
 
+export interface FileNode {
+  id: string;
+  name: string;
+  type: "file" | "folder";
+  parentId: string | null;
+  content: string;
+  language: string;
+}
+
 interface RoomState {
-  code: string;
-  users: Map<string, string>; // socketId → username
+  files: FileNode[];
+  users: Map<string, string>;
   hostSocketId: string | null;
-  roles: Map<string, Role>; // username → role
+  roles: Map<string, Role>;
 }
 
 const rooms = new Map<string, RoomState>();
 
+function langFromName(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    js: "javascript", ts: "typescript", tsx: "typescript", jsx: "javascript",
+    py: "python", java: "java", cpp: "cpp", cc: "cpp", cxx: "cpp",
+    c: "c", html: "html", htm: "html", css: "css", rs: "rust",
+    go: "go", json: "json", md: "markdown", sh: "shell", rb: "ruby",
+    php: "php", kt: "kotlin", swift: "swift", cs: "csharp",
+  };
+  return map[ext] ?? "plaintext";
+}
+
+function makeDefaultFiles(roomId: string): FileNode[] {
+  const rootId = randomUUID();
+  const indexId = randomUUID();
+  return [
+    {
+      id: rootId,
+      name: "project",
+      type: "folder",
+      parentId: null,
+      content: "",
+      language: "",
+    },
+    {
+      id: indexId,
+      name: "index.js",
+      type: "file",
+      parentId: rootId,
+      content: `// Welcome to 2gether Programming!\n// Room: ${roomId}\n\nconsole.log("Hello, World!");\n`,
+      language: "javascript",
+    },
+  ];
+}
+
+function deleteRecursive(files: FileNode[], id: string): FileNode[] {
+  const children = files.filter((f) => f.parentId === id);
+  let result = files.filter((f) => f.id !== id);
+  for (const child of children) {
+    result = deleteRecursive(result, child.id);
+  }
+  return result;
+}
+
 function getOrCreateRoom(roomId: string): RoomState {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
-      code: `// Welcome to 2gether Programming!\n// Room: ${roomId}\n// Start coding together...\n\nconsole.log("Hello, World!");\n`,
+      files: makeDefaultFiles(roomId),
       users: new Map(),
       hostSocketId: null,
       roles: new Map(),
@@ -46,30 +100,26 @@ export function setupSocketHandlers(io: SocketIOServer) {
       socket.join(roomId);
 
       const room = getOrCreateRoom(roomId);
-
       const userCount = room.users.size;
       const assignedUsername = username || (userCount === 0 ? "User1" : "User2");
       currentUsername = assignedUsername;
       room.users.set(socket.id, assignedUsername);
 
-      // First to join is the host
       const isHost = room.hostSocketId === null;
-      if (isHost) {
-        room.hostSocketId = socket.id;
-      }
+      if (isHost) room.hostSocketId = socket.id;
+      if (!room.roles.has(assignedUsername)) room.roles.set(assignedUsername, null);
 
-      // Initialize role entry if not present
-      if (!room.roles.has(assignedUsername)) {
-        room.roles.set(assignedUsername, null);
-      }
+      // Send the default active file (first file in tree)
+      const firstFile = room.files.find((f) => f.type === "file");
 
       socket.emit("room-joined", {
         username: assignedUsername,
         usersOnline: room.users.size,
-        code: room.code,
         isHost,
         roles: getRolesPayload(room),
         users: getUsersList(room),
+        files: room.files,
+        activeFileId: firstFile?.id ?? null,
       });
 
       socket.to(roomId).emit("user-joined", {
@@ -81,92 +131,131 @@ export function setupSocketHandlers(io: SocketIOServer) {
       io.to(roomId).emit("user-count", { usersOnline: room.users.size });
     });
 
-    socket.on("code-change", ({ roomId, code }: { roomId: string; code: string }) => {
-      const room = rooms.get(roomId);
-      if (room) {
-        room.code = code;
-        socket.to(roomId).emit("code-update", { code });
-      }
-    });
-
-    socket.on("send-message", ({ roomId, message }: { roomId: string; message: string }) => {
-      const room = rooms.get(roomId);
-      if (!room) return;
-      const senderUsername = room.users.get(socket.id);
-      const chatMessage = {
-        id: Date.now().toString(),
-        username: senderUsername || "Unknown",
-        message,
-        timestamp: Date.now(),
-      };
-      socket.to(roomId).emit("chat-message", chatMessage);
-    });
-
-    socket.on("assign-role", ({
+    // File content changes
+    socket.on("file-content-change", ({
       roomId,
-      username,
-      role,
+      fileId,
+      code,
     }: {
       roomId: string;
-      username: string;
-      role: Role;
+      fileId: string;
+      code: string;
+    }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      const file = room.files.find((f) => f.id === fileId);
+      if (file) file.content = code;
+      socket.to(roomId).emit("file-content-updated", { fileId, code });
+    });
+
+    // Create file or folder
+    socket.on("create-item", ({
+      roomId,
+      parentId,
+      name,
+      type,
+    }: {
+      roomId: string;
+      parentId: string | null;
+      name: string;
+      type: "file" | "folder";
     }) => {
       const room = rooms.get(roomId);
       if (!room) return;
 
-      // Only the host can assign roles
-      if (room.hostSocketId !== socket.id) return;
-
-      // Enforce: only one driver and one navigator at a time
-      if (role === "driver" || role === "navigator") {
-        for (const [uname, existingRole] of room.roles.entries()) {
-          if (existingRole === role) {
-            room.roles.set(uname, null);
-          }
-        }
+      // Deduplicate name
+      let finalName = name;
+      let suffix = 1;
+      const siblings = room.files.filter((f) => f.parentId === parentId).map((f) => f.name);
+      while (siblings.includes(finalName)) {
+        const dot = name.lastIndexOf(".");
+        finalName = dot > 0
+          ? `${name.slice(0, dot)} ${suffix}${name.slice(dot)}`
+          : `${name} ${suffix}`;
+        suffix++;
       }
 
-      room.roles.set(username, role);
+      const newItem: FileNode = {
+        id: randomUUID(),
+        name: finalName,
+        type,
+        parentId,
+        content: type === "file" ? `// ${finalName}\n` : "",
+        language: type === "file" ? langFromName(finalName) : "",
+      };
+      room.files.push(newItem);
+      io.to(roomId).emit("fs-updated", { files: room.files, newItemId: newItem.id });
+    });
 
-      // Broadcast updated roles to everyone in the room
-      io.to(roomId).emit("roles-updated", {
-        roles: getRolesPayload(room),
-        users: getUsersList(room),
+    // Delete file or folder (recursive)
+    socket.on("delete-item", ({ roomId, id }: { roomId: string; id: string }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      room.files = deleteRecursive(room.files, id);
+      io.to(roomId).emit("fs-updated", { files: room.files, deletedId: id });
+    });
+
+    // Rename
+    socket.on("rename-item", ({ roomId, id, name }: { roomId: string; id: string; name: string }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      const item = room.files.find((f) => f.id === id);
+      if (item) {
+        item.name = name;
+        if (item.type === "file") item.language = langFromName(name);
+      }
+      io.to(roomId).emit("fs-updated", { files: room.files });
+    });
+
+    // Chat message
+    socket.on("send-message", ({ roomId, message }: { roomId: string; message: string }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      const senderUsername = room.users.get(socket.id);
+      socket.to(roomId).emit("chat-message", {
+        id: Date.now().toString(),
+        username: senderUsername || "Unknown",
+        message,
+        timestamp: Date.now(),
       });
     });
 
-    socket.on("disconnect", () => {
-      console.log(`Client disconnected: ${socket.id}`);
-      if (currentRoomId) {
-        const room = rooms.get(currentRoomId);
-        if (room) {
-          room.users.delete(socket.id);
-
-          // If host left, transfer host to next user (if any)
-          if (room.hostSocketId === socket.id) {
-            const nextSocketId = room.users.keys().next().value;
-            room.hostSocketId = nextSocketId ?? null;
-            if (nextSocketId) {
-              io.to(nextSocketId).emit("host-transferred", { isHost: true });
-            }
-          }
-
-          io.to(currentRoomId).emit("user-left", {
-            username: currentUsername,
-            usersOnline: room.users.size,
-            users: getUsersList(room),
-          });
-          io.to(currentRoomId).emit("user-count", { usersOnline: room.users.size });
-
-          if (room.users.size === 0) {
-            setTimeout(() => {
-              const r = rooms.get(currentRoomId!);
-              if (r && r.users.size === 0) {
-                rooms.delete(currentRoomId!);
-              }
-            }, 5 * 60 * 1000);
-          }
+    // Role assignment
+    socket.on("assign-role", ({
+      roomId, username, role,
+    }: { roomId: string; username: string; role: Role }) => {
+      const room = rooms.get(roomId);
+      if (!room || room.hostSocketId !== socket.id) return;
+      if (role === "driver" || role === "navigator") {
+        for (const [uname, existing] of room.roles.entries()) {
+          if (existing === role) room.roles.set(uname, null);
         }
+      }
+      room.roles.set(username, role);
+      io.to(roomId).emit("roles-updated", { roles: getRolesPayload(room), users: getUsersList(room) });
+    });
+
+    socket.on("disconnect", () => {
+      if (!currentRoomId) return;
+      const room = rooms.get(currentRoomId);
+      if (!room) return;
+      room.users.delete(socket.id);
+      if (room.hostSocketId === socket.id) {
+        const next = room.users.keys().next().value;
+        room.hostSocketId = next ?? null;
+        if (next) io.to(next).emit("host-transferred", { isHost: true });
+      }
+      io.to(currentRoomId).emit("user-left", {
+        username: currentUsername,
+        usersOnline: room.users.size,
+        users: getUsersList(room),
+      });
+      io.to(currentRoomId).emit("user-count", { usersOnline: room.users.size });
+      if (room.users.size === 0) {
+        setTimeout(() => {
+          const r = rooms.get(currentRoomId!);
+          if (r && r.users.size === 0) rooms.delete(currentRoomId!);
+        }, 5 * 60 * 1000);
       }
     });
   });

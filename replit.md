@@ -2,7 +2,7 @@
 
 ## Overview
 
-A real-time pair programming platform where two developers can collaborate using a shared Monaco Editor, live chat, and code execution — all running in the browser.
+A real-time pair programming platform where developers can collaborate using a shared Monaco Editor, live chat, AI assistant, file system, and code execution — all running in the browser.
 
 ## Stack
 
@@ -11,68 +11,82 @@ A real-time pair programming platform where two developers can collaborate using
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5 + Socket.io
-- **Database**: PostgreSQL + Drizzle ORM (provisioned but not used yet)
+- **Database**: PostgreSQL + Drizzle ORM (provisioned)
 - **Validation**: Zod (zod/v4), drizzle-zod
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Frontend**: React + Vite + Tailwind CSS v4
 - **Editor**: Monaco Editor (@monaco-editor/react)
 - **Real-time**: Socket.io
+- **AI**: OpenAI via Replit AI Integrations (gpt-5-mini)
 
 ## Structure
 
 ```text
-artifacts-monorepo/
-├── artifacts/
-│   ├── 2gether/          # React + Vite frontend (pair programming UI)
-│   │   ├── src/
-│   │   │   ├── pages/
-│   │   │   │   ├── Home.tsx        # Landing page with room join/create
-│   │   │   │   └── Room.tsx        # Pair programming room
-│   │   │   ├── components/IDE/
-│   │   │   │   ├── TopNav.tsx      # Header with room ID and status
-│   │   │   │   ├── Editor.tsx      # Monaco Editor wrapper
-│   │   │   │   ├── Console.tsx     # Code output panel
-│   │   │   │   └── ChatPanel.tsx   # Real-time chat sidebar
-│   │   │   └── hooks/
-│   │   │       ├── use-socket.ts   # Socket.io integration
-│   │   │       └── use-run-code.ts # Code execution via API
-│   └── api-server/       # Express API server with Socket.io
-│       └── src/
-│           ├── socket.ts           # Socket.io handlers (rooms, code sync, chat)
-│           └── routes/
-│               ├── rooms.ts        # REST room management
-│               └── run-code.ts     # JavaScript code execution (vm2)
-├── lib/
-│   ├── api-spec/         # OpenAPI spec + Orval codegen
-│   ├── api-client-react/ # Generated React Query hooks
-│   ├── api-zod/          # Generated Zod schemas
-│   └── db/               # Drizzle ORM schema + DB connection
-└── package.json
+artifacts/
+├── 2gether/              # React + Vite frontend
+│   └── src/
+│       ├── pages/
+│       │   ├── Home.tsx              # Landing page (Framer-style)
+│       │   └── Room.tsx              # Pair programming room
+│       ├── components/
+│       │   ├── UsernameModal.tsx     # Username picker modal
+│       │   └── IDE/
+│       │       ├── TopNav.tsx        # Header (room ID, roles, status)
+│       │       ├── Editor.tsx        # Monaco Editor wrapper
+│       │       ├── Console.tsx       # Code execution output panel
+│       │       ├── ChatPanel.tsx     # Team chat + AI assistant tabs
+│       │       ├── FileTree.tsx      # File/folder explorer panel
+│       │       └── RolePanel.tsx     # Driver/Navigator role assignment
+│       └── hooks/
+│           ├── use-socket.ts         # All real-time state (files, chat, roles)
+│           └── use-run-code.ts       # POST /api/run-code mutation
+└── api-server/           # Express API server
+    └── src/
+        ├── socket.ts               # Socket.io: rooms, files, code sync, chat, roles
+        └── routes/
+            ├── rooms.ts            # REST room management
+            ├── run-code.ts         # JavaScript execution (vm2)
+            └── ai-chat.ts          # AI coding assistant (streaming SSE)
 ```
 
 ## Key Features
 
-1. **Homepage** (`/`) — Enter or generate a Room ID, click "Join Room"
-2. **Room** (`/room/:roomId`) — Full IDE environment:
-   - Monaco Editor with VS Code dark theme
-   - Real-time code sync via Socket.io (`/api/socket.io`)
-   - Run Code button → executes JavaScript in sandboxed vm2
-   - Console output panel
-   - Team chat sidebar
+1. **Username selection** — Modal on first visit, stored in localStorage
+2. **File system** — Create/rename/delete files and folders, synced in real-time
+3. **Multi-language editor** — Monaco with proper syntax for JS, TS, Python, Java, C++, HTML, CSS, Rust, Go
+4. **Real-time code sync** — Per-file content synced to all room members
+5. **JavaScript execution** — Run JS files in sandboxed vm2, see console output
+6. **Team Chat** — Real-time chat with usernames and timestamps
+7. **AI Assistant** — Streaming GPT assistant aware of your current code and language
+8. **Driver/Navigator roles** — Host assigns roles; navigator gets read-only editor
+9. **Landing page** — Framer-style dark SaaS landing page at `/`
 
 ## Socket.io Events
 
-- `join-room` → assigns username (User1/User2), syncs initial code
-- `code-change` / `code-update` → bidirectional code sync
-- `send-message` / `chat-message` → chat
-- `user-joined` / `user-left` / `user-count` → presence
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `join-room` | Client→Server | Join room with username |
+| `room-joined` | Server→Client | Initial state (files, roles, users) |
+| `file-content-change` | Client→Server | Edit a file |
+| `file-content-updated` | Server→Client | Broadcast file edit to others |
+| `create-item` | Client→Server | Create file or folder |
+| `delete-item` | Client→Server | Delete file/folder (recursive) |
+| `rename-item` | Client→Server | Rename file/folder |
+| `fs-updated` | Server→Client | Broadcast updated file tree |
+| `send-message` | Client→Server | Send chat message |
+| `chat-message` | Server→Client | Receive chat message |
+| `assign-role` | Client→Server | Host assigns driver/navigator |
+| `roles-updated` | Server→Client | Broadcast role changes |
+| `user-joined/left/count` | Server→Client | Presence events |
+| `host-transferred` | Server→Client | New host on old host disconnect |
 
 ## API Routes
 
-- `POST /api/run-code` — execute JavaScript, returns `{ output, error }`
-- `POST /api/rooms` — create/register a room
-- `GET /api/rooms/:roomId` — get room info
+- `POST /api/run-code` — Execute JavaScript, returns `{ output, error }`
+- `POST /api/ai-chat` — Streaming AI response (SSE), takes `{ message, code, language, history }`
+- `POST /api/rooms` — Create/register a room
+- `GET /api/rooms/:roomId` — Get room info
 
 ## Services
 
