@@ -12,7 +12,6 @@ import { useRunCode } from "@/hooks/use-run-code";
 
 export function Room() {
   const { roomId } = useParams<{ roomId: string }>();
-
   const [displayName, setDisplayName] = useState<string | null>(() => getSavedUsername());
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -21,7 +20,7 @@ export function Room() {
     isConnected,
     usersOnline,
     username,
-    files = [],       // default prevents crash if socket hasn't connected yet
+    files = [],
     activeFileId,
     selectFile,
     messages = [],
@@ -39,7 +38,6 @@ export function Room() {
 
   const { mutate: runCode, isPending: isRunning } = useRunCode();
 
-  // Safely find active file — files defaults to [] above
   const activeFile = files.find((f) => f.id === activeFileId) ?? null;
   const activeCode = activeFile?.content ?? "";
   const activeLanguage = activeFile?.language ?? "javascript";
@@ -65,11 +63,16 @@ export function Room() {
     });
   };
 
+  // Changing username triggers a socket reconnect (displayName is a hook dep)
+  const handleChangeUsername = (name: string) => {
+    saveUsername(name);
+    setDisplayName(name);
+  };
+
   const isReadOnly = myRole === "navigator";
 
   if (!roomId) return null;
 
-  // Show username modal before entering the room
   if (!displayName) {
     return (
       <div className="h-screen w-full bg-background">
@@ -97,6 +100,7 @@ export function Room() {
         currentUser={username}
         myRole={myRole}
         onAssignRole={assignRole}
+        onChangeUsername={handleChangeUsername}
       />
 
       <div className="flex-1 flex overflow-hidden min-h-0">

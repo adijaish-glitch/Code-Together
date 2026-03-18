@@ -3,6 +3,7 @@ import { Users, Copy, Check, LogOut, Code2, Wifi, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { RolePanel, RoleBadge } from "./RolePanel";
+import { AccountSettings } from "./AccountSettings";
 
 type Role = "driver" | "navigator" | null;
 
@@ -16,6 +17,7 @@ interface TopNavProps {
   currentUser: string;
   myRole: Role;
   onAssignRole: (username: string, role: Role) => void;
+  onChangeUsername: (name: string) => void;
 }
 
 export function TopNav({
@@ -28,6 +30,7 @@ export function TopNav({
   currentUser,
   myRole,
   onAssignRole,
+  onChangeUsername,
 }: TopNavProps) {
   const [copied, setCopied] = useState(false);
 
@@ -39,6 +42,7 @@ export function TopNav({
 
   return (
     <div className="h-12 border-b border-border bg-sidebar flex items-center justify-between px-4 shrink-0 select-none z-10 relative">
+      {/* Left: Logo + Room ID */}
       <div className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center text-primary">
@@ -48,27 +52,26 @@ export function TopNav({
             2gether Programming
           </span>
         </Link>
-        <div className="w-px h-5 bg-border mx-2 hidden sm:block" />
+        <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
         <div className="flex items-center gap-2 bg-background/50 px-2.5 py-1 rounded border border-border/50">
-          <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">ROOM</span>
+          <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Room</span>
           <span className="text-xs font-mono text-foreground font-medium">{roomId}</span>
           <button
             onClick={copyRoomId}
-            className="ml-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+            className="ml-1 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
             title="Copy Room ID"
           >
-            {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+            {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
           </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* My current role badge (non-host) */}
-        {!isHost && myRole && (
-          <RoleBadge role={myRole} />
-        )}
+      {/* Right: Controls */}
+      <div className="flex items-center gap-2">
+        {/* My role badge (non-host observers) */}
+        {!isHost && myRole && <RoleBadge role={myRole} />}
 
-        {/* Role assignment panel (host only) */}
+        {/* Role assignment (host only) */}
         <RolePanel
           isHost={isHost}
           users={users}
@@ -79,27 +82,39 @@ export function TopNav({
 
         <div className="w-px h-5 bg-border/50 hidden sm:block" />
 
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          {isConnected ? (
-            <Wifi size={14} className="text-success" />
-          ) : (
-            <WifiOff size={14} className="text-destructive" />
-          )}
-          <span className={cn(isConnected ? "text-success" : "text-destructive")}>
-            {isConnected ? "Connected" : "Disconnected"}
+        {/* Connection status */}
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          {isConnected
+            ? <Wifi size={13} className="text-success" />
+            : <WifiOff size={13} className="text-destructive" />}
+          <span className={cn("hidden sm:inline", isConnected ? "text-success" : "text-destructive")}>
+            {isConnected ? "Connected" : "Offline"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50">
-          <Users size={14} className={usersOnline > 1 ? "text-primary" : "text-muted-foreground"} />
-          <span className="text-foreground">{usersOnline} <span className="text-muted-foreground hidden sm:inline">online</span></span>
+        {/* Online count */}
+        <div className="flex items-center gap-1.5 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50">
+          <Users size={13} className={usersOnline > 1 ? "text-primary" : "text-muted-foreground"} />
+          <span className="text-foreground">{usersOnline}</span>
+          <span className="text-muted-foreground hidden sm:inline">online</span>
         </div>
 
+        <div className="w-px h-5 bg-border/50 hidden sm:block" />
+
+        {/* Account settings */}
+        <AccountSettings
+          username={currentUser}
+          myRole={myRole}
+          isHost={isHost}
+          onChangeUsername={onChangeUsername}
+        />
+
+        {/* Leave room */}
         <Link
           href="/"
-          className="flex items-center gap-2 text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive hover:text-white px-3 py-1.5 rounded transition-colors"
+          className="flex items-center gap-1.5 text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive hover:text-white px-3 py-1.5 rounded-lg transition-colors"
         >
-          <LogOut size={14} />
+          <LogOut size={13} />
           <span className="hidden sm:inline">Leave</span>
         </Link>
       </div>
