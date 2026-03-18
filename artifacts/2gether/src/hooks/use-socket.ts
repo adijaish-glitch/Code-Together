@@ -10,12 +10,12 @@ interface ChatMessage {
   timestamp: number;
 }
 
-export function useSocket(roomId: string) {
+export function useSocket(roomId: string, displayName: string) {
   const [isConnected, setIsConnected] = useState(false);
   const [usersOnline, setUsersOnline] = useState(1);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [code, setCode] = useState("// Write your code here...\nconsole.log('Hello, 2gether Programming!');");
-  const [username, setUsername] = useState("Developer");
+  const [username, setUsername] = useState(displayName);
   const [isHost, setIsHost] = useState(false);
   const [roles, setRoles] = useState<Record<string, Role>>({});
   const [users, setUsers] = useState<string[]>([]);
@@ -39,7 +39,7 @@ export function useSocket(roomId: string) {
 
     socket.on("connect", () => {
       setIsConnected(true);
-      socket.emit("join-room", { roomId });
+      socket.emit("join-room", { roomId, username: displayName });
     });
 
     socket.on("disconnect", () => setIsConnected(false));
@@ -91,7 +91,7 @@ export function useSocket(roomId: string) {
     });
 
     return () => { socket.disconnect(); };
-  }, [roomId, addSystemMessage]);
+  }, [roomId, displayName, addSystemMessage]);
 
   const sendCodeUpdate = useCallback((newCode: string) => {
     setCode(newCode);
